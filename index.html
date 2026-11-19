@@ -57,10 +57,9 @@ footer .btn{padding:7px 16px;font-size:.9rem}
 .phead strong{font:800 1.2rem var(--display)}
 .pbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .pbtns .btn{padding:6px 14px;font-size:.9rem;text-decoration:none;display:inline-block}
-.tog{display:flex;gap:6px;align-items:center;font-size:.9rem;font-weight:600;cursor:pointer}
 .phint{margin:0;font-size:.85rem;color:var(--mute)}
 html{-webkit-text-size-adjust:100%}
-.btn,.chip,.actions a,.actions button,.tog{touch-action:manipulation;min-height:44px}
+.btn,.chip,.actions a,.actions button{touch-action:manipulation;min-height:44px}
 .chip{min-height:40px}
 .actions a,.btn{display:inline-flex;align-items:center;justify-content:center}
 @media (max-width:1100px){#player{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;border-radius:0;padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}}
@@ -96,14 +95,13 @@ html{-webkit-text-size-adjust:100%}
   <div class="phead">
     <strong id="ptitle"></strong>
     <span class="pbtns">
-      <label class="tog"><input type="checkbox" id="pproxy" style="width:auto;padding:0"> Proxy</label>
       <a class="btn ghost" id="pnew" target="_blank" rel="noopener noreferrer">Open in new tab</a>
       <button class="btn ghost" id="pfull">Fullscreen</button>
       <button class="btn" id="pclose">Close</button>
     </span>
   </div>
   <iframe id="pframe" title="Game" allow="fullscreen; gamepad; autoplay; clipboard-write; accelerometer; gyroscope" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups"></iframe>
-  <p class="phint" id="phint">Blank screen? That site doesn't allow embedding. Switch Proxy on above, or use Open in new tab.</p>
+  <p class="phint" id="phint">Blank screen? That site doesn’t allow embedding. Use Open in new tab.</p>
 </dialog>
 
 <dialog id="con">
@@ -142,7 +140,6 @@ html{-webkit-text-size-adjust:100%}
     <input id="f-img" type="url" placeholder="https://">
     <label for="f-desc">Short note (optional)</label>
     <textarea id="f-desc" rows="2" maxlength="140"></textarea>
-    <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" id="f-proxy" style="width:auto"> Open through my proxy</label>
     <p class="err" id="err" role="alert"></p>
     <div class="row">
       <button type="button" class="btn ghost" id="cancel">Cancel</button>
@@ -159,8 +156,12 @@ const SEED = [
   {id:"s2",title:"Hextris",url:"https://hextris.io/",genre:"Arcade",desc:"Fast-paced puzzle on a spinning hexagon."},
   {id:"s3",title:"Chrome Dino",url:"https://chromedino.com/",genre:"Arcade",desc:"The offline dinosaur runner, anytime."}
 ];
+// Games built into this file. They always show (even when the server list is in use) and can't be removed from the page.
+const PINNED = [
+  {id:"p1",title:"TBOI Online",url:"https://tboi.online/",genre:"Action",desc:"Top-down dungeon crawler, played right in your browser.",pinned:true}
+];
 const PASS_HASH="a2de93602cf5a7eb23a7b69d786d1af36ca83fbd14c4e4fc926220018519c25d"; // SHA-256 of "gameshelf:" + your password. Default password: changeme
-const SERVER="https://shy-wave-a7eb.thegreatsnowyfox.workers.dev/";       // paste your Cloudflare Worker URL here: it stores the shared game list and runs the proxy
+const SERVER="https://shy-wave-a7eb.thegreatsnowyfox.workers.dev/";       // your Cloudflare Worker URL: it stores the shared game list and checks the admin password
 const KEY="gameshelf:v1";
 const COLORS=["#2D3CFF","#E4572E","#17A398","#7B2CBF","#D81E5B","#3A7D44","#F18F01"];
 let mem={added:[],hidden:[]};   // fallback if storage is blocked
@@ -171,7 +172,7 @@ function load(){try{const v=JSON.parse(localStorage.getItem(KEY));if(v&&Array.is
 function save(d){mem=d;try{localStorage.setItem(KEY,JSON.stringify(d))}catch(e){}}
 const safeUrl=u=>{try{const x=new URL(u);return /^https?:$/.test(x.protocol)?x.href:null}catch(e){return null}};
 let serverOn=false;
-const all=()=>{if(serverOn)return base;const d=load();return base.concat(d.added).filter(g=>!d.hidden.includes(g.id))};
+const all=()=>{if(serverOn)return PINNED.concat(base);const d=load();return PINNED.concat(base,d.added).filter(g=>!d.hidden.includes(g.id))};
 
 function render(){
   const games=all(), q=$("q").value.trim().toLowerCase();
@@ -195,9 +196,9 @@ function render(){
     const t=document.createElement("h2");t.textContent=g.title;
     const p=document.createElement("p");p.textContent=g.desc||"";
     const acts=document.createElement("div");acts.className="actions";
-    const a=document.createElement("a");const href=safeUrl(g.url);a.href=g.proxy&&serverBase()&&href?serverBase()+"?url="+encodeURIComponent(href):href||"#";a.target="_blank";a.rel="noopener noreferrer";a.textContent="Play";a.onclick=e=>{if(a.getAttribute("href")!=="#"){e.preventDefault();play(g)}};
-    const rm=document.createElement("button");rm.className="admin-only";rm.textContent="Remove";rm.onclick=()=>remove(g);
-    acts.append(a,rm);
+    const a=document.createElement("a");const href=safeUrl(g.url);a.href=href||"#";a.target="_blank";a.rel="noopener noreferrer";a.textContent="Play";a.onclick=e=>{if(a.getAttribute("href")!=="#"){e.preventDefault();play(g)}};
+    acts.append(a);
+    if(!g.pinned){const rm=document.createElement("button");rm.className="admin-only";rm.textContent="Remove";rm.onclick=()=>remove(g);acts.append(rm)}
     info.append(t);
     if(g.genre){const tg=document.createElement("div");tg.className="tag";tg.textContent=g.genre;info.append(tg)}
     info.append(p,acts);c.append(cv,info);grid.append(c);
@@ -213,20 +214,13 @@ function remove(g){
 }
 
 let cur=null;
-const HINT="Blank screen? That site doesn't allow embedding. Switch Proxy on above, or use Open in new tab.";
 function serverBase(){try{return localStorage.getItem("gs-proxy")||SERVER}catch(e){return SERVER}}
-function loadGame(){
-  const direct=safeUrl(cur.url),pb=serverBase(),on=$("pproxy").checked;
-  $("phint").textContent=on&&!pb?"No server address set yet. Unlock the Console, paste your Worker address, then try again.":HINT;
-  const src=on&&pb?pb+"?url="+encodeURIComponent(direct):direct;
-  $("pframe").src=src;$("pnew").href=src;
-}
 function play(g){
   cur=g;$("ptitle").textContent=g.title;
-  $("pproxy").checked=!!(g.proxy&&serverBase());
-  loadGame();$("player").showModal();
+  const src=safeUrl(g.url);
+  $("pframe").src=src;$("pnew").href=src;
+  $("player").showModal();
 }
-$("pproxy").onchange=loadGame;
 $("pclose").onclick=()=>$("player").close();
 $("pfull").onclick=()=>{const f=$("pframe");(f.requestFullscreen||f.webkitRequestFullscreen||(()=>{})).call(f)};
 $("player").addEventListener("close",()=>{$("pframe").src="about:blank"});
@@ -237,14 +231,14 @@ $("form").addEventListener("submit",e=>{
   const url=safeUrl($("f-url").value.trim()),imgRaw=$("f-img").value.trim();
   if(!url){e.preventDefault();$("err").textContent="Enter a link that starts with http:// or https://";return}
   if(imgRaw&&!safeUrl(imgRaw)){e.preventDefault();$("err").textContent="The cover image link must start with http:// or https://";return}
-  const g={id:"u"+Date.now(),title:$("f-title").value.trim(),url,genre:$("f-genre").value.trim(),img:imgRaw,desc:$("f-desc").value.trim(),proxy:$("f-proxy").checked};
+  const g={id:"u"+Date.now(),title:$("f-title").value.trim(),url,genre:$("f-genre").value.trim(),img:imgRaw,desc:$("f-desc").value.trim()};
   if(serverBase()){api("POST","/games",g).then(refresh).catch(x=>alert("Couldn't save to the server: "+x.message));return}
   const d=load();d.added.push(g);save(d);render();
 });
 $("q").oninput=render;
 
 $("export").onclick=()=>{
-  const blob=new Blob([JSON.stringify(all(),null,2)],{type:"application/json"});
+  const blob=new Blob([JSON.stringify(all().filter(g=>!g.pinned),null,2)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="games.json";a.click();URL.revokeObjectURL(a.href);
 };
 $("import").onclick=()=>$("file").click();
@@ -254,9 +248,9 @@ $("file").onchange=async e=>{
     if(!Array.isArray(arr))throw 0;
     if(serverBase()){await api("POST","/games",arr.filter(g=>g&&g.title&&safeUrl(g.url)));await refresh();e.target.value="";return}
     const d=load(), ids=new Set(all().map(g=>g.id));
-    arr.filter(g=>g&&g.title&&safeUrl(g.url)&&!ids.has(g.id)).forEach(g=>d.added.push({id:g.id||"i"+Math.random().toString(36).slice(2),title:String(g.title),url:g.url,genre:g.genre||"",img:g.img||"",desc:g.desc||"",proxy:!!g.proxy}));
+    arr.filter(g=>g&&g.title&&safeUrl(g.url)&&!ids.has(g.id)).forEach(g=>d.added.push({id:g.id||"i"+Math.random().toString(36).slice(2),title:String(g.title),url:g.url,genre:g.genre||"",img:g.img||"",desc:g.desc||""}));
     save(d);render();
-  }catch(err){alert("That file isn't a valid games.json.")}
+  }catch(err){alert("That file isn’t a valid games.json.")}
   e.target.value="";
 };
 
@@ -269,7 +263,7 @@ $("unlock").onclick=async()=>{
   try{
     if(serverBase()){
       try{sessionStorage.setItem("gs-pw",v)}catch(e){}
-      try{await api("POST","/auth")}catch(e){try{sessionStorage.removeItem("gs-pw")}catch(x){}$("pwerr").textContent=e.message==="Wrong password"?"Wrong password.":"Couldn't reach the server.";return}
+      try{await api("POST","/auth")}catch(e){try{sessionStorage.removeItem("gs-pw")}catch(x){}$("pwerr").textContent=e.message==="Wrong password"?"Wrong password.":"Couldn’t reach the server.";return}
       setAdmin(true);
     }else if(await sha(v)===PASS_HASH)setAdmin(true);
     else $("pwerr").textContent="Wrong password.";
